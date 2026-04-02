@@ -24,10 +24,11 @@ import java.util.stream.Collectors;
 @Order(1)
 public class Ff4jSecurityFilter extends OncePerRequestFilter {
 
+    private static final String CONTEXT_PATH = "/align";
     private static final String FF4J_TOKEN_COOKIE = "FF4J_TOKEN";
-    private static final String LOGIN_PAGE = "/login.html";
-    private static final String API_LOGIN = "/api/login";
-    private static final String API_LOGOUT = "/api/logout";
+    private static final String LOGIN_PAGE = "/align/login.html";
+    private static final String API_LOGIN = "/align/api/login";
+    private static final String API_LOGOUT = "/align/api/logout";
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
@@ -37,13 +38,13 @@ public class Ff4jSecurityFilter extends OncePerRequestFilter {
 
         // Skip filtering for login page, login API, and logout API
         if (path.equals(LOGIN_PAGE) || path.equals(API_LOGIN) || path.equals(API_LOGOUT) || 
-            path.startsWith("/static/") || path.startsWith("/css/") || path.startsWith("/js/")) {
+            path.startsWith("/align/static/") || path.startsWith("/align/css/") || path.startsWith("/align/js/")) {
             chain.doFilter(request, response);
             return;
         }
 
         // Only protect FF4J console paths
-        if (!path.startsWith("/ff4j-web-console")) {
+        if (!path.startsWith("/align/ff4j-web-console")) {
             chain.doFilter(request, response);
             return;
         }
@@ -63,7 +64,7 @@ public class Ff4jSecurityFilter extends OncePerRequestFilter {
             }
         } else {
             // No valid token, redirect to login page
-            response.sendRedirect(LOGIN_PAGE);
+            response.sendRedirect(CONTEXT_PATH + "/login.html");
         }
     }
 

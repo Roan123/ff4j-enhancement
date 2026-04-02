@@ -46,7 +46,7 @@ public class LoginController {
         // Write token to HttpOnly Cookie
         Cookie cookie = new Cookie("FF4J_TOKEN", mockToken);
         cookie.setHttpOnly(true);
-        cookie.setPath("/");
+        cookie.setPath("/align");
         // disable to let it expire after browser closed
         // cookie.setMaxAge(3600); // 1 hour
         // cookie.setSecure(true); // Enable if using HTTPS
@@ -62,7 +62,7 @@ public class LoginController {
     public ResponseEntity<?> logout(HttpServletResponse response) {
         Cookie cookie = new Cookie("FF4J_TOKEN", "");
         cookie.setHttpOnly(true);
-        cookie.setPath("/");
+        cookie.setPath("/align");
         cookie.setMaxAge(0); // Expire immediately
         response.addCookie(cookie);
         
