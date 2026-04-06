@@ -15,7 +15,7 @@ import java.util.stream.Collectors;
 
 /**
  * Security filter that validates JWT token from cookie and sets security context.
- * Protects FF4J web console paths.
+ * Protects FF4J web console paths with role-based access control.
  *
  * @author Roan
  * @date 2026/3/30
@@ -29,6 +29,9 @@ public class Ff4jSecurityFilter extends OncePerRequestFilter {
     private static final String LOGIN_PAGE = "/align/login.html";
     private static final String API_LOGIN = "/align/api/login";
     private static final String API_LOGOUT = "/align/api/logout";
+    
+    // Role required for write operations
+    private static final String ADMIN_ROLE = "ADMIN";
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
@@ -56,8 +59,18 @@ public class Ff4jSecurityFilter extends OncePerRequestFilter {
             // Parse token and set security context
             Ff4jSecurityContext.Ff4jUser user = parseToken(token);
             Ff4jSecurityContext.set(user);
+            
+            // Pass user info to other filters via request attribute
+            request.setAttribute("ff4j.user", user);
 
             try {
+            // Check if user has ADMIN role for write operations
+            String method = request.getMethod();
+            if (!user.hasRole(ADMIN_ROLE) && isWriteOperation(path, method)) {
+                response.sendError(HttpServletResponse.SC_FORBIDDEN, "Access denied. ADMIN role required for this operation.");
+                return;
+            }
+                
                 chain.doFilter(request, response);
             } finally {
                 Ff4jSecurityContext.clear();
@@ -66,6 +79,27 @@ public class Ff4jSecurityFilter extends OncePerRequestFilter {
             // No valid token, redirect to login page
             response.sendRedirect(CONTEXT_PATH + "/login.html");
         }
+    }
+
+    /**
+     * Check if the request is a write operation (create, update, delete)
+     */
+    private boolean isWriteOperation(String path, String method) {
+        // Check HTTP method - POST, PUT, DELETE are write operations
+        if ("POST".equalsIgnoreCase(method) || "PUT".equalsIgnoreCase(method) || "DELETE".equalsIgnoreCase(method)) {
+            return true;
+        }
+        
+        // Console write operations via GET with specific paths
+        return path.contains("/api/features") && (
+            path.contains("/create") || 
+            path.contains("/enable") || 
+            path.contains("/disable") ||
+            path.contains("/delete") ||
+            path.endsWith("/enable") ||
+            path.endsWith("/disable") ||
+            path.endsWith("/delete")
+        );
     }
 
     /**
@@ -95,16 +129,26 @@ public class Ff4jSecurityFilter extends OncePerRequestFilter {
 
     /**
      * Parses token to extract user information.
-     * For mock tokens, extract username from token.
+     * For mock tokens, extract username and roles from token.
      * In production, decode JWT and extract claims.
      */
     private Ff4jSecurityContext.Ff4jUser parseToken(String token) {
-        // Mock parsing: "mock-jwt-token-{username}-{timestamp}"
-        String[] parts = token.split("-");
-        String username = parts.length >= 4 ? parts[3] : "unknown";
+        // Mock parsing: "mock-jwt-token-{username}-{timestamp}.{role1}.{role2}"
+        String[] parts = token.split("\\.");
+        String[] tokenParts = parts[0].split("-");
+        String username = tokenParts.length >= 4 ? tokenParts[3] : "unknown";
         
-        // Default role for now
-        Set<String> roles = Set.of("ADMIN");
+        // Extract roles if present
+        Set<String> roles;
+        if (parts.length > 1 && parts[1] != null && !parts[1].isEmpty()) {
+            roles = Arrays.stream(parts[1].split("\\."))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .collect(Collectors.toSet());
+        } else {
+            // Default role for now
+            roles = Set.of("ADMIN");
+        }
         
         return new Ff4jSecurityContext.Ff4jUser(username, roles);
     }
