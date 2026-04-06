@@ -35,3 +35,7 @@ build/
 ### AI ###
 console*.log
 page*.yml
+
+### Worktrees ###
+.worktrees/
+worktrees/
