@@ -52,6 +52,12 @@
             <artifactId>spring-boot-starter-jdbc</artifactId>
         </dependency>
 
+        <!-- JPA starter for ORM support -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>org.ff4j</groupId>
             <artifactId>ff4j-spring-boot-starter-webmvc</artifactId>

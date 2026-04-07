@@ -1,29 +1,30 @@
 package com.roan.align.security;
 
+import com.roan.align.entity.FF4jUserRole;
+import com.roan.align.repository.UserRoleRepository;
 import org.ff4j.security.AuthorizationsManager;
+import org.springframework.stereotype.Component;
 
-import javax.sql.DataSource;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Custom FF4J Authorization Manager that retrieves user permissions
- * from the database (FF4J_USER_ROLES table).
+ * from the database via Spring Data JPA.
  *
  * @author Roan
  * @date 2026/3/30
  */
+@Component
 public class CustomFf4jAuthManager implements AuthorizationsManager {
 
-    private final DataSource dataSource;
+    private final UserRoleRepository userRoleRepository;
 
-    public CustomFf4jAuthManager(DataSource dataSource) {
-        this.dataSource = dataSource;
+    public CustomFf4jAuthManager(UserRoleRepository userRoleRepository) {
+        this.userRoleRepository = userRoleRepository;
     }
 
     /**
@@ -37,37 +38,23 @@ public class CustomFf4jAuthManager implements AuthorizationsManager {
         if (user != null && user.getRoles() != null && !user.getRoles().isEmpty()) {
             return user.getRoles();
         }
-        
+
         // Fallback to database if security context is not set
         if (user == null || user.getUsername() == null) {
             return Collections.emptySet();
         }
-        
+
         return getRolesFromDatabase(user.getUsername());
     }
 
     /**
-     * Query user roles from database.
+     * Query user roles from database using JPA.
      */
     private Set<String> getRolesFromDatabase(String username) {
-        Set<String> roles = new HashSet<>();
-        String sql = "SELECT ROLE_NAME FROM FF4J_USER_ROLES WHERE USERNAME = ?";
-        
-        try (Connection conn = dataSource.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setString(1, username);
-            
-            try (ResultSet rs = stmt.executeQuery()) {
-                while (rs.next()) {
-                    roles.add(rs.getString("ROLE_NAME"));
-                }
-            }
-        } catch (SQLException e) {
-            // Log error and return empty set
-            System.err.println("Error fetching user roles: " + e.getMessage());
-        }
-        
-        return roles;
+        List<FF4jUserRole> userRoles = userRoleRepository.findByUsername(username);
+        return userRoles.stream()
+                .map(FF4jUserRole::getRoleName)
+                .collect(Collectors.toSet());
     }
 
     /**
@@ -76,23 +63,19 @@ public class CustomFf4jAuthManager implements AuthorizationsManager {
      */
     @Override
     public Set<String> listAllPermissions() {
-        Set<String> permissions = new HashSet<>();
-        String sql = "SELECT DISTINCT ROLE_NAME FROM FF4J_USER_ROLES";
-        
-        try (Connection conn = dataSource.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql);
-             ResultSet rs = stmt.executeQuery()) {
-            while (rs.next()) {
-                permissions.add(rs.getString("ROLE_NAME"));
-            }
-        } catch (SQLException e) {
-            // Return default roles if query fails
-            permissions.add("ADMIN");
-            permissions.add("USER");
-            permissions.add("READONLY");
+        List<String> distinctRoles = userRoleRepository.findAllDistinctRoleNames();
+
+        // Return database roles if available, otherwise default roles
+        if (distinctRoles != null && !distinctRoles.isEmpty()) {
+            return new HashSet<>(distinctRoles);
         }
-        
-        return permissions;
+
+        // Default roles if database is empty
+        Set<String> defaultPermissions = new HashSet<>();
+        defaultPermissions.add("ADMIN");
+        defaultPermissions.add("USER");
+        defaultPermissions.add("READONLY");
+        return defaultPermissions;
     }
 
     /**

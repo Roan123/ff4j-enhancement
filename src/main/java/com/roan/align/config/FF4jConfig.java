@@ -22,6 +22,9 @@ public class FF4jConfig {
     @Autowired
     private DataSource dataSource;
 
+    @Autowired
+    private CustomFf4jAuthManager customFf4jAuthManager;
+
     @Bean
     public FF4j ff4j() {
         FF4j ff4j = new FF4j();
@@ -35,13 +38,13 @@ public class FF4jConfig {
         ff4j.audit(true);
         
         // Set custom authorization manager for role-based access control
-        ff4j.setAuthorizationsManager(new CustomFf4jAuthManager(dataSource));
+        ff4j.setAuthorizationsManager(customFf4jAuthManager);
         
         return ff4j;
     }
 
     @Bean
-    public AuthorizationsManager authorizationsManager(@Autowired DataSource dataSource) {
-        return new CustomFf4jAuthManager(dataSource);
+    public AuthorizationsManager authorizationsManager() {
+        return customFf4jAuthManager;
     }
 }
