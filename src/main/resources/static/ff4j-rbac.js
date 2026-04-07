@@ -17,7 +17,7 @@
     }
 
     /**
-     * Initialize RBAC by hiding write operation elements for non-admin users
+     * Initialize RBAC by disabling write operation elements for non-admin users
      */
     function initRBAC() {
         if (!hasAdminRole()) {
@@ -33,23 +33,63 @@
                 }
             });
 
-            // Hide edit and delete icons in feature list
-            var actionCells = document.querySelectorAll('table td:last-child, table td:nth-child(7)');
-            actionCells.forEach(function(cell) {
-                cell.style.display = 'none';
-            });
+            disableRbacElements();
         }
     }
 
     /**
-     * Override original toggle function to enforce RBAC
+     * Disable all RBAC-protected elements
+     * Called both on init and when table is updated (for dynamic content)
+     */
+    function disableRbacElements() {
+        if (hasAdminRole()) return;
+
+        // Disable toggle checkboxes properly
+        var toggleCheckboxes = document.querySelectorAll('table tbody input[type="checkbox"]');
+        toggleCheckboxes.forEach(function(cb) {
+            cb.disabled = true;
+        });
+
+        // Disable edit buttons/links (column 7)
+        var editLinks = document.querySelectorAll('table td:nth-child(7) a, table td:nth-child(7) button');
+        editLinks.forEach(function(link) {
+            link.setAttribute('disabled', 'disabled');
+            link.style.pointerEvents = 'none';
+            link.style.opacity = '0.5';
+        });
+
+        // Disable delete buttons/links (column 8)
+        var deleteLinks = document.querySelectorAll('table td:nth-child(8) a, table td:nth-child(8) button');
+        deleteLinks.forEach(function(link) {
+            link.setAttribute('disabled', 'disabled');
+            link.style.pointerEvents = 'none';
+            link.style.opacity = '0.5';
+        });
+    }
+
+    /**
+     * Watch for dynamic DOM changes and re-apply RBAC when needed
+     */
+    function observeDomChanges() {
+        var observer = new MutationObserver(function(mutations) {
+            disableRbacElements();
+        });
+        
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+    }
+
+    /**
+     * Lightweight fallback - prevent any toggle attempt that bypasses disabled attribute
+     * (defense in depth - shouldn't be needed with properly disabled checkboxes)
      */
     function overrideToggleFunction() {
         var originalToggle = window.toggle;
         window.toggle = function(checkbox) {
             if (!hasAdminRole()) {
-                alert('Access denied. ADMIN role required to toggle features.');
-                // Revert checkbox state
+                // Silently revert - no alert needed, checkbox is already visually disabled
                 checkbox.checked = !checkbox.checked;
                 return false;
             }
@@ -58,13 +98,13 @@
     }
 
     /**
-     * Override original delete function to enforce RBAC
+     * Lightweight fallback - prevent any delete attempt that bypasses disabled buttons
      */
     function overrideDeleteFunction() {
         var originalDelete = window.deleteFeature;
         window.deleteFeature = function(uid) {
             if (!hasAdminRole()) {
-                alert('Access denied. ADMIN role required to delete features.');
+                // Silently ignore - button should already be visually disabled
                 return false;
             }
             return originalDelete ? originalDelete(uid) : true;
@@ -84,8 +124,11 @@
         overrideToggleFunction();
         overrideDeleteFunction();
 
-        // Hide write operation elements
+        // Apply RBAC restrictions
         initRBAC();
+
+        // Watch for dynamic DOM changes (e.g., pagination, sorting)
+        observeDomChanges();
     }
 
     // Initialize when DOM is ready
@@ -98,6 +141,7 @@
     // Expose for debugging
     window.FF4jRbac = {
         hasAdminRole: hasAdminRole,
-        initRBAC: initRBAC
+        initRBAC: initRBAC,
+        disableRbacElements: disableRbacElements
     };
 })();
