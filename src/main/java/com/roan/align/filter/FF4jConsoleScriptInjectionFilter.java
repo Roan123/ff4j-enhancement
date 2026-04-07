@@ -3,6 +3,7 @@ package com.roan.align.filter;
 import jakarta.servlet.*;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+
 import java.io.CharArrayWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -31,7 +32,23 @@ public class FF4jConsoleScriptInjectionFilter implements Filter {
         HttpServletResponse httpResponse = (HttpServletResponse) response;
         String uri = httpRequest.getRequestURI();
         
+        // Only process HTML page requests (not static assets like images, fonts, CSS)
+        // Include: /ff4j-web-console/, /ff4j-web-console/features, /ff4j-web-console/index.html, etc.
+        // Exclude: /ff4j-web-console/static/*.css, /ff4j-web-console/images/*, /ff4j-web-console/*.js (files with extensions under static/)
+        boolean isHtmlConsolePage = false;
         if (uri != null && uri.contains(FF4J_CONSOLE_PATH)) {
+            // Get the path after /ff4j-web-console/
+            String consolePath = uri.substring(uri.indexOf(FF4J_CONSOLE_PATH) + FF4J_CONSOLE_PATH.length());
+            // Process if: empty, ends with /, ends with .html, or has no extension (console pages like features, properties, etc.)
+            // Exclude if: contains /static/ or has a known static file extension
+            boolean isStaticResource = consolePath.contains("/static/") || 
+                consolePath.matches(".*\\.(css|js|png|jpg|jpeg|gif|woff|ttf|svg|ico|map)$");
+            if (!isStaticResource) {
+                isHtmlConsolePage = true;
+            }
+        }
+        
+        if (isHtmlConsolePage) {
             // Wrap response to capture output
             ResponseWrapper wrapper = new ResponseWrapper(httpResponse);
             chain.doFilter(request, wrapper);
