@@ -8,8 +8,10 @@ import org.ff4j.property.Property;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -73,10 +75,11 @@ public class WrapperServiceImpl implements WrapperService {
 
     /**
      * Check if user property matches feature property.
+     * Supports comma-separated values in feature property (e.g., "US, CN, JP").
      *
-     * @param userProperty       user property from request header
-     * @param propertyKey       property key (country or channel)
-     * @param customProperties   feature's custom properties
+     * @param userProperty     user property from request header
+     * @param propertyKey      property key (country or channel)
+     * @param customProperties feature's custom properties
      * @return true if property matches or doesn't exist, false if doesn't match
      */
     private boolean propertyCheck(final String userProperty, final String propertyKey,
@@ -101,11 +104,21 @@ public class WrapperServiceImpl implements WrapperService {
 
         String featureProperty = featurePropertyValue.toString();
 
-        // Case-insensitive comparison
-        boolean matches = StringUtils.equalsIgnoreCase(featureProperty, userProperty);
+        // Parse feature property into a Set (trim whitespace, case-insensitive)
+        Set<String> featureValues = Arrays.stream(featureProperty.split(","))
+                .map(String::trim)
+                .filter(StringUtils::isNotBlank)
+                .collect(Collectors.toSet());
 
-        log.debug("Property check - userProperty: {}, propertyKey: {}, featureProperty: {}, matches: {}",
-                userProperty, propertyKey, featureProperty, matches);
+        // Normalize userProperty to match against the set
+        String normalizedUserProperty = userProperty.trim();
+
+        // Check if user property is in the feature's allowed values (case-insensitive)
+        boolean matches = featureValues.stream()
+                .anyMatch(fv -> StringUtils.equalsIgnoreCase(fv, normalizedUserProperty));
+
+        log.debug("Property check - userProperty: {}, propertyKey: {}, featureProperties: {}, matches: {}",
+                userProperty, propertyKey, featureValues, matches);
 
         return matches;
     }
